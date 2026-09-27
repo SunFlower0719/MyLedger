@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B2A3D; --paper:#F6F3EC; --card:#FFFFFF;
+    --sage:#5F7A5F; --rust:#B5502F; --amber:#B8863A; --grey:#8A8F98;
+    --line: rgba(27,42,61,0.12);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#EDEAE2; --paper:#14181F; --card:#1D222B;
+      --sage:#8FB08F; --rust:#E08363; --amber:#E3B876; --grey:#9AA0AA;
+      --line: rgba(237,234,226,0.14);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#EDEAE2; --paper:#14181F; --card:#1D222B;
+    --sage:#8FB08F; --rust:#E08363; --amber:#E3B876; --grey:#9AA0AA;
+    --line: rgba(237,234,226,0.14);
+  }
+  html{scroll-padding-top: env(safe-area-inset-top, 0px);}
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    min-height:100%;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:28px 20px 100px;}
+  h1{font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:2rem; margin:0 0 4px;}
+  .tagline{color:var(--grey); font-size:0.92rem; margin:0 0 24px;}
+  nav{display:flex; gap:6px; border-bottom:1px solid var(--line); margin-bottom:22px; overflow-x:auto;}
+  nav button{
+    font-family:inherit; font-size:0.9rem; font-weight:500; color:var(--grey);
+    background:none; border:none; padding:10px 14px; cursor:pointer;
+    border-bottom:2px solid transparent; white-space:nowrap;
+  }
+  nav button.active{color:var(--ink); border-bottom-color:var(--ink);}
+  nav button:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--sage); outline-offset:2px;}
+  .view{display:none;}
+  .view.active{display:block;}
+  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px;}
+  @media (max-width:520px){.grid{grid-template-columns:repeat(2,1fr);}}
+  .stat{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px;}
+  .stat .label{font-size:0.76rem; color:var(--grey); margin-bottom:6px;}
+  .stat .value{font-family:'Fraunces',serif; font-size:1.4rem; font-weight:600;}
+  .stat.pos .value{color:var(--sage);}
+  .stat.neg .value{color:var(--rust);}
+  section{margin-bottom:30px;}
+  section h2{font-family:'Fraunces',serif; font-size:1.15rem; font-weight:600; margin:0 0 12px;}
+  .empty{color:var(--grey); font-size:0.9rem; padding:16px 0; border-top:1px solid var(--line);}
+  .row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:12px 0; border-top:1px solid var(--line);
+  }
+  .row:last-child{}
+  .row .who{font-weight:500; font-size:0.95rem;}
+  .row .meta{font-size:0.8rem; color:var(--grey); margin-top:2px;}
+  .row .amt{font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums;}
+  .amt.income{color:var(--sage);}
+  .amt.expense{color:var(--rust);}
+  .amt.savings{color:var(--amber);}
+  .badge{
+    display:inline-block; font-size:0.7rem; font-weight:600; padding:2px 8px;
+    border-radius:100px; margin-left:8px; vertical-align:middle;
+  }
+  .badge.pending{background:rgba(184,134,58,0.15); color:var(--amber);}
+  .badge.overdue{background:rgba(181,80,47,0.15); color:var(--rust);}
+  .badge.source{background:rgba(95,122,95,0.13); color:var(--sage);}
+  .actions{display:flex; gap:8px;}
+  .iconbtn{
+    background:none; border:1px solid var(--line); border-radius:7px; color:var(--grey);
+    font-size:0.78rem; padding:5px 10px; cursor:pointer; font-family:inherit;
+  }
+  .iconbtn:hover{color:var(--ink); border-color:var(--ink);}
+  form{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px;}
+  .field{margin-bottom:14px;}
+  label{display:block; font-size:0.82rem; font-weight:500; margin-bottom:6px;}
+  input, select{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    background:var(--paper); color:var(--ink); font-family:inherit; font-size:0.95rem;
+  }
+  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .type-picker{display:flex; gap:8px; margin-bottom:14px;}
+  .type-picker button{
+    flex:1; padding:10px; border-radius:8px; border:1px solid var(--line);
+    background:var(--paper); color:var(--grey); font-family:inherit; font-weight:500;
+    font-size:0.88rem; cursor:pointer;
+  }
+  .type-picker button.sel{border-color:currentColor;}
+  .type-picker button[data-type="income"].sel{color:var(--sage); background:rgba(95,122,95,0.08);}
+  .type-picker button[data-type="expense"].sel{color:var(--rust); background:rgba(181,80,47,0.08);}
+  .type-picker button[data-type="saving"].sel{color:var(--amber); background:rgba(184,134,58,0.08);}
+  .submit{
+    width:100%; padding:12px; border:none; border-radius:8px; background:var(--ink);
+    color:var(--paper); font-family:inherit; font-weight:600; font-size:0.95rem; cursor:pointer; margin-top:4px;
+  }
+  .submit:hover{opacity:0.9;}
+  .checkline{display:flex; align-items:center; gap:8px; margin-bottom:14px; font-size:0.88rem;}
+  .checkline input{width:auto;}
+  .filterbar{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .filterbar button{
+    font-family:inherit; font-size:0.8rem; padding:6px 12px; border-radius:100px;
+    border:1px solid var(--line); background:none; color:var(--grey); cursor:pointer;
+  }
+  .filterbar button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .startbal{display:flex; align-items:center; gap:10px; margin-bottom:20px; font-size:0.88rem; color:var(--grey);}
+  .startbal input{width:140px; padding:6px 10px;}
+  #syncStatus.synced{color:var(--sage);}
+  #syncStatus.local{color:var(--amber);}
+  .loginscreen{
+    position:fixed; inset:0; background:var(--paper); color:var(--ink);
+    display:flex; align-items:center; justify-content:center; z-index:50;
+    padding:20px; text-align:center;
+    padding-top:calc(env(safe-area-inset-top,0px) + 20px);
+    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px);
+  }
+  .logincard{max-width:320px;}
+  .logincard h1{font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:2rem; margin:0;}
+</style>
+</head>
+<body>
+<div id="loginScreen" class="loginscreen">
+  <div class="logincard">
+    <h1 style="margin-bottom:6px;">Ledger</h1>
+    <p class="tagline" style="margin-bottom:26px;">Sign in to view your financial records.</p>
+    <button id="loginGoogleBtn" class="submit" style="width:auto; padding:12px 30px;">Sign in with Google</button>
+    <p class="tagline" id="loginHint" style="margin-top:20px; font-size:0.8rem;">Checking your account…</p>
+  </div>
+</div>
+<div class="wrap" id="appRoot" style="display:none;">
+  <h1>Ledger</h1>
+  <p class="tagline">Your income, expenses, and savings — including what's still coming.</p>
+  <p class="tagline" id="syncStatus" style="margin-top:-14px;">Checking your account…</p>
+  <button id="signOutBtn" class="iconbtn" style="display:none; margin:0 0 16px;">Sign out</button>
+
+  <nav>
+    <button class="active" data-view="dashboard">Dashboard</button>
+    <button data-view="transactions">All transactions</button>
+    <button data-view="add">Add new</button>
+  </nav>
+
+  <div class="view active" id="view-dashboard">
+    <div class="startbal">
+      <span>Starting balance:</span>
+      <input type="number" id="startingBalance" step="0.01" placeholder="0.00">
+    </div>
+
+    <div class="grid" id="statGrid"></div>
+
+    <section>
+      <h2>Expected income</h2>
+      <div id="expectedIncomeList"></div>
+    </section>
+
+    <section>
+      <h2>Upcoming bills &amp; pending transactions</h2>
+      <div id="upcomingList"></div>
+    </section>
+
+    <section>
+      <h2>Recently processed</h2>
+      <div id="recentList"></div>
+    </section>
+  </div>
+
+  <div class="view" id="view-transactions">
+    <div class="filterbar" id="filterBar">
+      <button data-f="all" class="active">All</button>
+      <button data-f="income">Income</button>
+      <button data-f="expense">Expenses</button>
+      <button data-f="saving">Savings</button>
+      <button data-f="pending">Pending</button>
+    </div>
+    <div id="allList"></div>
+  </div>
+
+  <div class="view" id="view-add">
+    <form id="txForm">
+      <div class="type-picker" id="typePicker">
+        <button type="button" data-type="expense" class="sel">Expense</button>
+        <button type="button" data-type="income">Income</button>
+        <button type="button" data-type="saving">Savings</button>
+      </div>
+      <div class="field">
+        <label for="txDesc">Description</label>
+        <input id="txDesc" type="text" placeholder="e.g. Electric bill" required>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="txAmount">Amount</label>
+          <input id="txAmount" type="number" step="0.01" min="0" placeholder="0.00" required>
+        </div>
+        <div class="field">
+          <label for="txDate">Date</label>
+          <input id="txDate" type="date" required>
+        </div>
+      </div>
+      <div class="field" id="sourceField" style="display:none;">
+        <label for="txSource">Income source</label>
+        <select id="txSource">
+          <option value="Salary">Salary</option>
+          <option value="Freelance">Freelance</option>
+          <option value="Business">Business</option>
+          <option value="Investment">Investment</option>
+          <option value="Gift">Gift</option>
+          <option value="Refund">Refund</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="checkline">
+        <input type="checkbox" id="txFuture">
+        <label for="txFuture" style="margin:0;">This is a future transaction (not yet processed)</label>
+      </div>
+      <div class="field" id="notesField">
+        <label for="txNotes">Notes (optional)</label>
+        <input id="txNotes" type="text" placeholder="Account, category, reference...">
+      </div>
+      <button type="submit" class="submit">Save transaction</button>
+    </form>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script>
+// ---- Firebase setup ----
+// 1. Go to https://console.firebase.google.com, create a free project.
+// 2. In Build > Authentication, enable "Google" as a sign-in provider.
+// 3. In Build > Firestore Database, create a database (start in production mode).
+// 4. Project settings > General > Your apps > Web app: copy the config below.
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+const firebaseConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+</script>
+<script>
+const STORAGE_KEY = 'ledger.transactions.v1';
+const BAL_KEY = 'ledger.startingBalance.v1';
+const fmt = n => (n<0?'-':'') + '$' + Math.abs(n).toFixed(2);
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+function load(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch(e){ return []; } }
+function loadBal(){ try{ const v = localStorage.getItem(BAL_KEY); return v===null? 0 : parseFloat(v); }catch(e){ return 0; } }
+
+let txs = load();
+let cloudDoc = null;
+
+function persist(){
+  const bal = parseFloat(startInput.value)||0;
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(txs));
+    localStorage.setItem(BAL_KEY, String(bal));
+  }catch(e){}
+  if(cloudDoc){
+    cloudDoc.set({ transactions: txs, startingBalance: bal }).catch(e=>{
+      console.error('Sync failed', e);
+      setSyncStatus('local', 'Sync failed — saved on this device only');
+    });
+  }
+}
+
+function setSyncStatus(mode, label){
+  const el = document.getElementById('syncStatus');
+  el.className = 'tagline ' + mode;
+  el.textContent = label;
+}
+function showApp(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = '';
+}
+function showLogin(hint){
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appRoot').style.display = 'none';
+  if(hint) document.getElementById('loginHint').textContent = hint;
+}
+
+async function initCloud(){
+  try{
+    const user = await claude.use('user');
+    const database = await claude.use('db');
+    if(user && database){
+      const uid = await user.id();
+      if(uid){
+        cloudDoc = database.doc('data/users/' + uid + '/ledger');
+        let name = '';
+        try{ name = (await user.me()).name; }catch(e){}
+        cloudDoc.onSnapshot(snap=>{
+          const data = snap.data();
+          if(data){
+            txs = Array.isArray(data.transactions) ? data.transactions : [];
+            if(typeof data.startingBalance === 'number') startInput.value = data.startingBalance.toFixed(2);
+          }
+          render();
+        }, err=>{
+          console.error('Ledger sync error', err);
+          setSyncStatus('local', 'Sync unavailable — saved on this device only');
+        });
+        setSyncStatus('synced', 'Signed in' + (name ? ' as ' + name : '') + ' · synced across your devices');
+        showApp();
+        return;
+      }
+    }
+  }catch(e){ /* not running inside a Claude artifact — fall through to Firebase */ }
+
+  if(firebaseConfigured){
+    initFirebase();
+  } else {
+    // No auth system available at all — nothing to gate behind, so just show the app.
+    setSyncStatus('local', 'Not signed in — records are saved on this device only');
+    showApp();
+  }
+}
+
+function initFirebase(){
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const store = firebase.firestore();
+  document.getElementById('loginGoogleBtn').onclick = () => {
+    document.getElementById('loginHint').textContent = 'Opening Google sign-in…';
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>{
+      console.error('Sign-in failed', e);
+      document.getElementById('loginHint').textContent = 'Sign-in failed — please try again.';
+    });
+  };
+  const signOutBtn = document.getElementById('signOutBtn');
+  signOutBtn.onclick = () => auth.signOut();
+  auth.onAuthStateChanged(u=>{
+    if(u){
+      cloudDoc = store.collection('users').doc(u.uid).collection('ledger').doc('data');
+      cloudDoc.onSnapshot(snap=>{
+        const data = snap.data();
+        if(data){
+          txs = Array.isArray(data.transactions) ? data.transactions : [];
+          if(typeof data.startingBalance === 'number') startInput.value = data.startingBalance.toFixed(2);
+        }
+        render();
+      }, err=>{
+        console.error('Firestore sync error', err);
+        setSyncStatus('local', 'Sync unavailable — saved on this device only');
+      });
+      setSyncStatus('synced', 'Signed in as ' + (u.displayName || u.email || 'you') + ' · synced across your devices');
+      signOutBtn.style.display = '';
+      showApp();
+    } else {
+      cloudDoc = null;
+      signOutBtn.style.display = 'none';
+      showLogin();
+    }
+  });
+}
+
+// ---- Navigation ----
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    if(btn.dataset.view==='add'){ document.getElementById('txDate').value = todayStr(); }
+  });
+});
+
+// ---- Add form ----
+const typePicker = document.getElementById('typePicker');
+let selectedType = 'expense';
+typePicker.querySelectorAll('button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    typePicker.querySelectorAll('button').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');
+    selectedType = b.dataset.type;
+    document.getElementById('sourceField').style.display = selectedType==='income' ? '' : 'none';
+  });
+});
+document.getElementById('txDate').value = todayStr();
+
+document.getElementById('txForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  const desc = document.getElementById('txDesc').value.trim();
+  const amount = parseFloat(document.getElementById('txAmount').value);
+  const date = document.getElementById('txDate').value;
+  const future = document.getElementById('txFuture').checked;
+  const notes = document.getElementById('txNotes').value.trim();
+  if(!desc || isNaN(amount) || !date) return;
+  const source = selectedType==='income' ? document.getElementById('txSource').value : '';
+  txs.push({
+    id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
+    type: selectedType, desc, amount, date, notes, source,
+    pending: future || date > todayStr()
+  });
+  persist();
+  e.target.reset();
+  document.getElementById('txDate').value = todayStr();
+  document.getElementById('txFuture').checked = false;
+  selectedType = 'expense';
+  typePicker.querySelectorAll('button').forEach(x=>x.classList.remove('sel'));
+  typePicker.querySelector('[data-type="expense"]').classList.add('sel');
+  document.getElementById('sourceField').style.display = 'none';
+  render();
+  document.querySelector('nav button[data-view="dashboard"]').click();
+});
+
+// ---- Starting balance ----
+const startInput = document.getElementById('startingBalance');
+startInput.value = loadBal().toFixed(2);
+startInput.addEventListener('change', ()=>{
+  persist();
+  render();
+});
+
+function markProcessed(id){
+  const t = txs.find(x=>x.id===id);
+  if(t){ t.pending = false; persist(); render(); }
+}
+function deleteTx(id){
+  txs = txs.filter(x=>x.id!==id);
+  persist();
+  render();
+}
+
+function txRow(t, opts={}){
+  const div = document.createElement('div');
+  div.className = 'row';
+  const sign = t.type==='income' ? '+' : (t.type==='expense' ? '-' : '−');
+  const amtClass = t.type;
+  const overdue = t.pending && t.date < todayStr();
+  div.innerHTML = `
+    <div>
+      <div class="who">${escapeHtml(t.desc)}${t.type==='income' && t.source ? `<span class="badge source">${escapeHtml(t.source)}</span>` : ''}${t.pending ? `<span class="badge ${overdue?'overdue':'pending'}">${overdue?'overdue':'pending'}</span>` : ''}</div>
+      <div class="meta">${t.date}${t.notes ? ' · '+escapeHtml(t.notes) : ''}</div>
+    </div>
+    <div class="actions">
+      <div class="amt ${amtClass}">${t.type==='expense'?'-':'+'}${fmt(t.amount)}</div>
+    </div>
+  `;
+  if(opts.withActions && t.pending){
+    const btnWrap = div.querySelector('.actions');
+    const b = document.createElement('button');
+    b.className='iconbtn'; b.textContent='Mark processed';
+    b.addEventListener('click', ()=>markProcessed(t.id));
+    btnWrap.prepend(b);
+  }
+  if(opts.deletable){
+    const btnWrap = div.querySelector('.actions');
+    const d = document.createElement('button');
+    d.className='iconbtn'; d.textContent='Delete';
+    d.addEventListener('click', ()=>{ if(confirm('Delete this transaction?')) deleteTx(t.id); });
+    btnWrap.appendChild(d);
+  }
+  return div;
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function computeStats(){
+  const startBal = loadBal();
+  const processed = txs.filter(t=>!t.pending);
+  let income=0, expense=0, savings=0;
+  processed.forEach(t=>{
+    if(t.type==='income') income+=t.amount;
+    else if(t.type==='expense') expense+=t.amount;
+    else if(t.type==='saving') savings+=t.amount;
+  });
+  const ending = startBal + income - expense - savings;
+  const pendingIncome = txs.filter(t=>t.pending && t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const pendingOut = txs.filter(t=>t.pending && t.type!=='income').reduce((s,t)=>s+t.amount,0);
+  const available = ending + pendingIncome - pendingOut;
+  return {startBal, income, expense, savings, ending, available, pendingIncome, pendingOut};
+}
+
+function render(){
+  const s = computeStats();
+  const grid = document.getElementById('statGrid');
+  grid.innerHTML = '';
+  const stats = [
+    ['Starting balance', fmt(s.startBal), ''],
+    ['Income', fmt(s.income), 'pos'],
+    ['Expenses', fmt(s.expense), 'neg'],
+    ['Savings set aside', fmt(s.savings), ''],
+    ['Ending balance', fmt(s.ending), s.ending>=0?'pos':'neg'],
+    ['Expected income', fmt(s.pendingIncome), s.pendingIncome>0?'pos':''],
+    ['Available cash', fmt(s.available), s.available>=0?'pos':'neg'],
+  ];
+  stats.forEach(([label,val,cls])=>{
+    const d = document.createElement('div');
+    d.className = 'stat '+(cls||'');
+    d.innerHTML = `<div class="label">${label}</div><div class="value">${val}</div>`;
+    grid.appendChild(d);
+  });
+
+  // Expected income (pending income only)
+  const expectedIncome = txs.filter(t=>t.pending && t.type==='income').sort((a,b)=>a.date.localeCompare(b.date));
+  const eiList = document.getElementById('expectedIncomeList');
+  eiList.innerHTML='';
+  if(expectedIncome.length===0){
+    eiList.innerHTML = '<div class="empty">No expected income logged. Add a future paycheck or payment from "Add new".</div>';
+  } else {
+    expectedIncome.forEach(t=>eiList.appendChild(txRow(t, {withActions:true})));
+  }
+
+  // Upcoming / pending (everything else: bills, savings not yet processed)
+  const upcoming = txs.filter(t=>t.pending && t.type!=='income').sort((a,b)=>a.date.localeCompare(b.date));
+  const upList = document.getElementById('upcomingList');
+  upList.innerHTML='';
+  if(upcoming.length===0){
+    upList.innerHTML = '<div class="empty">Nothing pending. Add a future bill or transaction from "Add new".</div>';
+  } else {
+    upcoming.forEach(t=>upList.appendChild(txRow(t, {withActions:true})));
+  }
+
+  // Recent processed
+  const recent = txs.filter(t=>!t.pending).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  const recList = document.getElementById('recentList');
+  recList.innerHTML='';
+  if(recent.length===0){
+    recList.innerHTML = '<div class="empty">No processed transactions yet.</div>';
+  } else {
+    recent.forEach(t=>recList.appendChild(txRow(t)));
+  }
+
+  renderAll();
+}
+
+let currentFilter = 'all';
+document.getElementById('filterBar').addEventListener('click', e=>{
+  if(e.target.tagName!=='BUTTON') return;
+  currentFilter = e.target.dataset.f;
+  document.querySelectorAll('#filterBar button').forEach(b=>b.classList.remove('active'));
+  e.target.classList.add('active');
+  renderAll();
+});
+
+function renderAll(){
+  const list = document.getElementById('allList');
+  list.innerHTML='';
+  let items = [...txs].sort((a,b)=>b.date.localeCompare(a.date));
+  if(currentFilter==='pending') items = items.filter(t=>t.pending);
+  else if(currentFilter!=='all') items = items.filter(t=>t.type===currentFilter);
+  if(items.length===0){
+    list.innerHTML = '<div class="empty">No transactions match this filter.</div>';
+  } else {
+    items.forEach(t=>list.appendChild(txRow(t, {withActions:true, deletable:true})));
+  }
+}
+
+render();
+initCloud();
+</script>
+</body>
+</html>
